@@ -10,7 +10,7 @@ on:
       - '.github/**'
       - '.idea/**'
       - '!.github/workflows/**'
-      -
+      
 jobs:
   build:
     name: Build Portal
