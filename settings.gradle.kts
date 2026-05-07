@@ -14,19 +14,17 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven ( url = "https://maven.aliyun.com/nexus/content/repositories/google")
-        maven ( url = "https://maven.aliyun.com/nexus/content/groups/public/" )
-        maven ( url = "https://maven.aliyun.com/nexus/content/repositories/jcenter")
         google()
         mavenCentral()
-        maven (url = "https://maven.pkg.jetbrains.space/public/p/ktor/eap")
-        maven (url = "https://dl.bintray.com/kotlin/kotlin-eap" )
-        maven (url = "https://api.xposed.info/" )
-        maven (url = "https://jitpack.io" )
-
-        maven { url = uri("https://jitpack.io") }
+        // 阿里云镜像作为备用，放在官方仓库之后，避免502影响主要依赖
+        maven(url = "https://maven.aliyun.com/nexus/content/repositories/google")
+        maven(url = "https://maven.aliyun.com/nexus/content/groups/public/")
+        maven(url = "https://maven.aliyun.com/nexus/content/repositories/jcenter")
+        maven(url = "https://maven.pkg.jetbrains.space/public/p/ktor/eap")
+        maven(url = "https://dl.bintray.com/kotlin/kotlin-eap")
+        maven(url = "https://api.xposed.info/")
+        maven(url = "https://jitpack.io")
     }
 }
 
