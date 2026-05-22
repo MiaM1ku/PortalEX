@@ -88,6 +88,19 @@
                         android:gravity="end|center">
 
                         <CheckedTextView
+                            android:id="@+id/route_loop"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="12dp"
+                            android:checkMark="?android:attr/listChoiceIndicatorMultiple"
+                            android:checkMarkTint="@color/portal_mock_off"
+                            android:checked="false"
+                            android:gravity="center"
+                            android:text="@string/route_loop"
+                            android:textColor="@color/portal_mock_off"
+                            android:textSize="12sp" />
+
+                        <CheckedTextView
                             android:id="@+id/rocker"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"

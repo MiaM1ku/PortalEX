@@ -44,6 +44,7 @@
   <string name="colorful">私のモナリザ</string>
   <string name="rocker_speed">ジョイスティックの速度</string>
   <string name="default_speed">1 ミリ秒</string>
+  <string name="route_loop">ループ</string>
   <string name="selinux">SELinux</string>
   <string name="need_open_selinux">SELinux を有効化するかどうか</string>
   <string name="altitude">測位高度</string>

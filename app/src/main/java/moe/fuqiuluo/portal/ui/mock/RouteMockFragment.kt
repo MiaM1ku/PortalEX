@@ -73,6 +73,13 @@ class RouteMockFragment : Fragment() {
             }
         }
 
+        binding.routeLoop.isChecked = mockServiceViewModel.isRouteLoopEnabled
+        binding.routeLoop.setOnClickListener {
+            val checkedTextView = it as CheckedTextView
+            checkedTextView.toggle()
+            mockServiceViewModel.isRouteLoopEnabled = checkedTextView.isChecked
+        }
+
         with(mockServiceViewModel) {
             if (rocker.isStart) {
                 binding.rocker.toggle()

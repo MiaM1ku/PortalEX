@@ -35,6 +35,7 @@ class MockServiceViewModel : ViewModel() {
     val routeMockCoroutine = CoroutineRouteMock()
 
     var isRouteStart = false
+    var isRouteLoopEnabled = false
 
     var locationManager: LocationManager? = null
         set(value) {
@@ -105,16 +106,24 @@ class MockServiceViewModel : ViewModel() {
                 do {
                     routeMockCoroutine.routeMockCoroutine()
                     delay(delayTime)
+                    val route = selectedRoute?.route
+                    if (route.isNullOrEmpty()) {
+                        routeMockCoroutine.pause()
+                        rocker.autoStatus = false
+                        routeStage = 0
+                        continue
+                    }
+
                     // 如果是第0阶段，定位到第一个点
                     if (routeStage == 0) {
                         MockServiceHelper.setLocation(
                             locationManager!!,
-                            selectedRoute!!.route[0].first,
-                            selectedRoute!!.route[0].second
+                            route[0].first,
+                            route[0].second
                         )
+                        resetDistanceAccumulator()
                         routeStage++
                     }
-                    val route = selectedRoute!!.route
 
                     // 处理所有已到达的阶段
                     while (routeStage < route.size) {
@@ -153,11 +162,16 @@ class MockServiceViewModel : ViewModel() {
 
                     // 检查是否已完成所有阶段
                     if (routeStage >= route.size) {
-                        routeMockCoroutine.pause()
-                        rocker.autoStatus = false
                         // 重设阶段
                         routeStage = 0
-                        break // 退出循环
+                        resetDistanceAccumulator()
+                        if (isRouteLoopEnabled) {
+                            continue
+                        } else {
+                            routeMockCoroutine.pause()
+                            rocker.autoStatus = false
+                            continue
+                        }
                     }
 
                     // 处理当前目标点的移动
