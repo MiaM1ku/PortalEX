@@ -49,12 +49,22 @@ location.extras?.putBoolean("is_mock", true)
 - [ ] **Portal** will mock the gps status.
 - [ ] **Portal** will mock the cell info.
 - [ ] **Portal** will mock the wifi info.
-- [x] **Portal** will mock the sensor info.
+- [x] **Portal** will mock the sensor info, including cadence-oriented accelerometer, step counter and step detector events.
 - [x] **Portal** can move position by rocker.
 - [x] **Portal** can set the speed in the settings.
 - [x] **Portal** can set the altitude in the settings.
 - [x] **Portal** can set the accuracy in the settings.
 - [x] **Portal** will change the bearing when moving.
+
+# Hook Scope
+
+PortalEX now separates system-service hooks from target-app sensor hooks:
+
+- To hook only system services for location/GNSS/WLAN behavior, select only system scope entries in LSPosed, such as `android`, `com.android.phone`, `com.android.location.fused`, `com.xiaomi.location.fused`, and `com.oplus.location`.
+- To hook only target apps for cadence simulation, select only the target running/fitness apps in LSPosed. Cadence simulation does not require the `android` system scope; it is controlled from PortalEX by broadcast and a floating window.
+- Selecting both groups enables both Portal location features and target-app cadence simulation in one module.
+
+Cadence simulation rewrites target-app sensor callbacks for accelerometer, step counter and step detector events. Configure the cadence range in PortalEX, then use the Cadence Mock page or floating window to sync/toggle state in the scoped target apps.
 
 # Build & Releases?
 
@@ -66,6 +76,7 @@ After careful consideration, the developer(s) believe that such software require
 
 - [GoGoGo](https://github.com/ZCShou/GoGoGo)
 - [Baidu Map SDK](https://lbsyun.baidu.com/faq/api?title=androidsdk)
+- [FuckRun](https://github.com/BieFan1029/FUCK-RUN-) and [uy-li/runhook](https://github.com/uy-li/runhook), for the cadence sensor simulation approach that inspired the integrated PortalEX cadence module.
 
 
 # License

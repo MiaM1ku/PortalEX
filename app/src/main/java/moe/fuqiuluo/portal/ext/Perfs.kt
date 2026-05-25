@@ -131,6 +131,30 @@ var Context.hookSensor: Boolean
         putBoolean("hookSensor", value)
     }
 
+var Context.cadenceMin: Float
+    get() = sharedPrefs.getFloat("cadenceMin", 172f)
+    set(value) = sharedPrefs.edit {
+        putFloat("cadenceMin", value)
+    }
+
+var Context.cadenceMax: Float
+    get() = sharedPrefs.getFloat("cadenceMax", 182f)
+    set(value) = sharedPrefs.edit {
+        putFloat("cadenceMax", value)
+    }
+
+var Context.cadenceMockEnabled: Boolean
+    get() = sharedPrefs.getBoolean("cadenceMockEnabled", false)
+    set(value) = sharedPrefs.edit {
+        putBoolean("cadenceMockEnabled", value)
+    }
+
+var Context.cadenceFloatingEnabled: Boolean
+    get() = sharedPrefs.getBoolean("cadenceFloatingEnabled", false)
+    set(value) = sharedPrefs.edit {
+        putBoolean("cadenceFloatingEnabled", value)
+    }
+
 //var Context.updateInterval: Long
 //    get() = sharedPrefs.getLong("updateInterval", FakeLoc.updateInterval)
 //
@@ -226,5 +250,4 @@ var Context.loopBroadcastlocation: Boolean
         putBoolean("loopBroadcastLocation", value)
         FakeLoc.loopBroadcastLocation = value
     }
-
 

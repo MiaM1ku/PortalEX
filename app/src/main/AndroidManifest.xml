@@ -56,6 +56,18 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".ui.cadence.CadenceFloatingService"
+            android:exported="false" />
+
+        <receiver
+            android:name=".ui.cadence.CadenceStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="moe.fuqiuluo.portal.action.REQUEST_CADENCE_STATE" />
+            </intent-filter>
+        </receiver>
+
         <!-- 百度地图定位服务 -->
         <service
             android:name="com.baidu.location.f"

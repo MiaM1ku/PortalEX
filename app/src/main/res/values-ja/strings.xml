@@ -63,7 +63,15 @@
   <string name="cdma">ネットワークを劣化させる</string>
   <string name="cdma_desc">ネットワークを CDMA にダウングレードします</string>
   <string name="hook_sensor">センサーハイジャッキング</string>
-  <string name="hook_sensor_desc">シュミレートされたリズム (改善予定)</string>
+  <string name="hook_sensor_desc">加速度、歩数計、歩行検知をシミュレート</string>
+  <string name="menu_cadence_mock">Cadence Mock</string>
+  <string name="cadence_mock_title">歩調シミュレーション</string>
+  <string name="cadence_mock_switch">センサー歩調シミュレーション</string>
+  <string name="cadence_mock_switch_desc">LSPosed のスコープ内アプリへ現在の歩調状態を送信します</string>
+  <string name="cadence_floating_title">フローティング制御</string>
+  <string name="cadence_floating_desc">対象アプリ内でフローティングウィンドウから歩調シミュレーションを切り替えます。初回はオーバーレイ権限が必要です。</string>
+  <string name="start_cadence_floating">フローティング開始</string>
+  <string name="sync_cadence_state">状態を同期</string>
   <string name="show_route">ルートを表示</string>
   <string name="item_report_duration_title">位置報告の間隔</string>
   <string name="item_report_duration_desc">位置を報告する頻度 (ミリ秒単位)</string>

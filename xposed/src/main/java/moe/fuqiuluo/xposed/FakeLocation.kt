@@ -11,6 +11,7 @@ import moe.fuqiuluo.xposed.hooks.fused.AndroidFusedLocationProviderHook
 import moe.fuqiuluo.xposed.hooks.fused.ThirdPartyLocationHook
 import moe.fuqiuluo.xposed.hooks.oplus.OplusLocationHook
 import moe.fuqiuluo.xposed.hooks.telephony.miui.MiuiTelephonyManagerHook
+import moe.fuqiuluo.xposed.hooks.sensor.CadenceSensorHook
 import moe.fuqiuluo.xposed.hooks.sensor.SystemSensorManagerHook
 import moe.fuqiuluo.xposed.hooks.telephony.TelephonyHook
 import moe.fuqiuluo.xposed.hooks.wlan.WlanHook
@@ -47,39 +48,22 @@ class FakeLocation: IXposedHookLoadPackage, IXposedHookZygoteInit {
      * @throws Throwable Everything the callback throws is caught and logged.
      */
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam?) {
-        if (lpparam?.packageName != "android" && lpparam?.packageName != "com.android.phone") {
-            return
-        }
+        val packageName = lpparam?.packageName ?: return
 
-        val systemClassLoader = (kotlin.runCatching {
-            lpparam.classLoader.loadClass("android.app.ActivityThread")
-                ?: Class.forName("android.app.ActivityThread")
-        }.onFailure {
-            Logger.error("Failed to find ActivityThread", it)
-        }.getOrNull() ?: return)
-            .getMethod("currentActivityThread")
-            .invoke(null)
-            .javaClass
-            .getClassLoader()
-
-        if (systemClassLoader == null) {
-            Logger.error("Failed to get system class loader")
-            return
-        }
-
-        if(System.getProperty("portal.injected_${lpparam.packageName}") == "true") {
+        if(System.getProperty("portal.injected_$packageName") == "true") {
             return
         } else {
-            System.setProperty("portal.injected_${lpparam.packageName}", "true")
+            System.setProperty("portal.injected_$packageName", "true")
         }
 
-        when (lpparam.packageName) {
+        when (packageName) {
             "com.android.phone" -> {
                 Logger.info("Found com.android.phone")
                 TelephonyHook(lpparam.classLoader)
                 MiuiTelephonyManagerHook(lpparam.classLoader)
             }
             "android" -> {
+                val systemClassLoader = getSystemClassLoader(lpparam) ?: return
                 Logger.info("Debug Log Status: ${FakeLoc.enableDebugLog}")
                 FakeLoc.isSystemServerProcess = true
                 startFakeLocHook(systemClassLoader)
@@ -99,7 +83,28 @@ class FakeLocation: IXposedHookLoadPackage, IXposedHookZygoteInit {
             "com.oplus.location" -> {
                 OplusLocationHook(lpparam.classLoader)
             }
+            else -> {
+                CadenceSensorHook(lpparam)
+            }
         }
+    }
+
+    private fun getSystemClassLoader(lpparam: XC_LoadPackage.LoadPackageParam): ClassLoader? {
+        return (kotlin.runCatching {
+            lpparam.classLoader.loadClass("android.app.ActivityThread")
+                ?: Class.forName("android.app.ActivityThread")
+        }.onFailure {
+            Logger.error("Failed to find ActivityThread", it)
+        }.getOrNull() ?: return null)
+            .getMethod("currentActivityThread")
+            .invoke(null)
+            ?.javaClass
+            ?.getClassLoader()
+            .also {
+                if (it == null) {
+                    Logger.error("Failed to get system class loader")
+                }
+            }
     }
 
     private fun startFakeLocHook(classLoader: ClassLoader) {

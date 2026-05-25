@@ -6,5 +6,14 @@
         <item>com.android.location.fused</item>
         <item>com.xiaomi.location.fused</item>
         <item>com.oplus.location</item>
+        <item>co.runner.app</item>
+        <item>com.heytap.health</item>
+        <item>com.gotokeep.keep</item>
+        <item>com.android.healthconnect.controller</item>
+        <item>com.huachenjie.shandong_school</item>
+        <item>com.huachenjie.shandong_school_pro</item>
+        <item>com.bxkj.student</item>
+        <item>com.zjwh.android_wh_physicalfitness</item>
+        <item>android.youma.com</item>
     </string-array>
 </resources>

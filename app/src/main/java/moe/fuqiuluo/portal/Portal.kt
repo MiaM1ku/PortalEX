@@ -7,6 +7,7 @@ import com.baidu.mapapi.CoordType
 import com.baidu.mapapi.SDKInitializer
 import com.tencent.bugly.crashreport.CrashReport
 import moe.fuqiuluo.portal.android.Bugly
+import moe.fuqiuluo.portal.ext.cadenceFloatingEnabled
 
 class Portal: Application() {
 
@@ -27,6 +28,7 @@ class Portal: Application() {
         CrashReport.setCollectPrivacyInfo(applicationContext, true)
 
         appContext = applicationContext
+        applicationContext.cadenceFloatingEnabled = false
 
         //CrashReport.setAllThreadStackEnable(applicationContext, true, true)
     }
