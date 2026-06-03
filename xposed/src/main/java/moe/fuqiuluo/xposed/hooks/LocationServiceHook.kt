@@ -156,6 +156,34 @@ data class MockGnssData(
     val carrierFreqs: FloatArray
 )
 
+private fun Throwable.isDeadObject(depth: Int = 0): Boolean {
+    if (depth > 4) return false
+    return this is DeadObjectException ||
+            (this is InvocationTargetException && targetException?.isDeadObject(depth + 1) == true) ||
+            cause?.isDeadObject(depth + 1) == true
+}
+
+private fun gnssListenerHook(
+    callback: XC_MethodHook.MethodHookParam.() -> Unit
+): XC_MethodHook {
+    return object : XC_MethodHook() {
+        override fun beforeHookedMethod(param: MethodHookParam) {
+            kotlin.runCatching {
+                param.callback()
+            }.onFailure {
+                XposedBridge.log(it)
+            }
+        }
+
+        override fun afterHookedMethod(param: MethodHookParam) {
+            val throwable = param.throwable ?: return
+            if (throwable.isDeadObject()) {
+                param.throwable = null
+            }
+        }
+    }
+}
+
 internal object LocationServiceHook: BaseLocationHook() {
     val locationListeners = LinkedBlockingQueue<Pair<String, IInterface>>()
 
@@ -477,7 +505,7 @@ internal object LocationServiceHook: BaseLocationHook() {
                         return
                     }
 
-                    if (cIGnssStatusListener.onceHookAllMethod("onSvStatusChanged", beforeHook {
+                    if (cIGnssStatusListener.onceHookAllMethod("onSvStatusChanged", gnssListenerHook {
                         // android 7.0.0
                         // void onSvStatusChanged(int svCount, in int[] svidWithFlags, in float[] cn0s,
                         //            in float[] elevations, in float[] azimuths);
@@ -494,7 +522,7 @@ internal object LocationServiceHook: BaseLocationHook() {
 
                         // https://www.csno-tarc.cn/system/constellation
 
-                        if (!FakeLoc.enableMockGnss) return@beforeHook
+                        if (!FakeLoc.enableMockGnss) return@gnssListenerHook
 
                         val svCount = Random.nextInt(FakeLoc.minSatellites, MAX_SATELLITES + 1)
                         val mockGps = MockGnssData(
@@ -560,7 +588,7 @@ internal object LocationServiceHook: BaseLocationHook() {
                                     mockGps.cn0s[it] - Random.nextFloat(2f, 5f)
                                 }
                             }
-                            return@beforeHook
+                            return@gnssListenerHook
                         }
 
                         if (args[0] != null && args[0].javaClass.name == "android.location.GnssStatus") {
@@ -589,7 +617,7 @@ internal object LocationServiceHook: BaseLocationHook() {
                             }.onFailure {
                                 XposedBridge.log(it)
                             }
-                            return@beforeHook
+                            return@gnssListenerHook
                         }
 
                         Logger.error("onSvStatusChanged: unsupported version: $method")
@@ -597,7 +625,7 @@ internal object LocationServiceHook: BaseLocationHook() {
                         Logger.error("find onSvStatusChanged failed!")
                     }
 
-                    cIGnssStatusListener.onceHookAllMethod("onNmeaReceived", beforeHook {
+                    cIGnssStatusListener.onceHookAllMethod("onNmeaReceived", gnssListenerHook {
                         if (FakeLoc.enableDebugLog) {
                             Logger.debug("onNmeaReceived")
                         }

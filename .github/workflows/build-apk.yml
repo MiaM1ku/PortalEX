@@ -49,11 +49,28 @@ jobs:
 
       - name: Setup google-services.json
         run: |
-          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
+          set -euo pipefail
+          if [ -z "${GOOGLE_SERVICES_JSON}" ]; then
+            echo "::error::Missing repository secret GOOGLE_SERVICES_JSON"
+            exit 1
+          fi
+          printf '%s' "${GOOGLE_SERVICES_JSON}" | base64 -d > app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
 
       - name: Build with Gradle
         run: |
-          printf '%s' "${{ secrets.SIGN_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          set -euo pipefail
+          if [ -z "${SIGN_KEYSTORE_BASE64}" ]; then
+            echo "::error::Missing repository secret SIGN_KEYSTORE_BASE64"
+            exit 1
+          fi
+          if [ -z "${KEYSTORE_PASSWORD}" ] || [ -z "${KEY_ALIAS}" ] || [ -z "${KEY_PASSWORD}" ]; then
+            echo "::error::Missing one of SIGN_KEYSTORE_PASSWORD, SIGN_ALIAS, SIGN_KEY_PASSWORD"
+            exit 1
+          fi
+          printf '%s' "${SIGN_KEYSTORE_BASE64}" | base64 -d > keystore.jks
+          keytool -list -keystore keystore.jks -storepass "${KEYSTORE_PASSWORD}" -alias "${KEY_ALIAS}" >/dev/null
           chmod +x ./gradlew
           ./gradlew :app:assembleRelease --build-cache --parallel --warning-mode all --stacktrace
           echo "APK_FILE_ALL=$(find app/build/outputs/apk/app/release -name '*.apk')" >> $GITHUB_ENV
@@ -61,6 +78,7 @@ jobs:
           echo "APK_FILE_X86_64=$(find app/build/outputs/apk/x64/release -name '*.apk')" >> $GITHUB_ENV
         env:
           KEYSTORE_PATH: "../keystore.jks"
+          SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.SIGN_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.SIGN_ALIAS }}
           KEY_PASSWORD: ${{ secrets.SIGN_KEY_PASSWORD }}
