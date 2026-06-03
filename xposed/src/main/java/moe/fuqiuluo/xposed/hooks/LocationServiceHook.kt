@@ -184,8 +184,20 @@ private fun gnssListenerHook(
     }
 }
 
+private fun suppressGnssDeadObjectHook(): XC_MethodHook {
+    return object : XC_MethodHook() {
+        override fun afterHookedMethod(param: MethodHookParam) {
+            val throwable = param.throwable ?: return
+            if (throwable.isDeadObject()) {
+                param.throwable = null
+            }
+        }
+    }
+}
+
 internal object LocationServiceHook: BaseLocationHook() {
     val locationListeners = LinkedBlockingQueue<Pair<String, IInterface>>()
+    private val gnssStatusProxyHooked = AtomicBoolean(false)
 
     // A random command is generated to prevent some apps from detecting Portal
     operator fun invoke(classLoader: ClassLoader) {
@@ -207,6 +219,7 @@ internal object LocationServiceHook: BaseLocationHook() {
         }
 
         cILocationManager.classLoader!!.let {
+            hookGnssStatusProxyDeadObject(it)
             BasicLocationHook(it)
             GnssHook(it)
             LocationProviderManagerHook(it)
@@ -861,6 +874,28 @@ internal object LocationServiceHook: BaseLocationHook() {
             }
         })
 
+    }
+
+    private fun hookGnssStatusProxyDeadObject(classLoader: ClassLoader) {
+        if (!gnssStatusProxyHooked.compareAndSet(false, true)) return
+
+        val cGnssStatusProxy = XposedHelpers.findClassIfExists(
+            "android.location.IGnssStatusListener\$Stub\$Proxy",
+            classLoader
+        )
+        if (cGnssStatusProxy == null) {
+            gnssStatusProxyHooked.set(false)
+            if (FakeLoc.enableDebugLog) {
+                Logger.debug("IGnssStatusListener.Stub.Proxy not found")
+            }
+            return
+        }
+
+        val svHooks = cGnssStatusProxy.hookAllMethods("onSvStatusChanged", suppressGnssDeadObjectHook())
+        val nmeaHooks = cGnssStatusProxy.hookAllMethods("onNmeaReceived", suppressGnssDeadObjectHook())
+        if (FakeLoc.enableDebugLog) {
+            Logger.debug("hook IGnssStatusListener.Stub.Proxy dead objects: sv=${svHooks.size}, nmea=${nmeaHooks.size}")
+        }
     }
 
     private fun hookILocationListener(listener: Any) {
