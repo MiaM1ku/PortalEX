@@ -10,6 +10,7 @@ import android.os.DeadObjectException
 import android.os.IBinder
 import android.os.IInterface
 import android.os.Parcel
+import android.os.RemoteException
 import com.hjq.device.compat.DeviceOs
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -163,6 +164,19 @@ private fun Throwable.isDeadObject(depth: Int = 0): Boolean {
             cause?.isDeadObject(depth + 1) == true
 }
 
+private fun Throwable.isRemoteException(depth: Int = 0): Boolean {
+    if (depth > 4) return false
+    return this is RemoteException ||
+            (this is InvocationTargetException && targetException?.isRemoteException(depth + 1) == true) ||
+            cause?.isRemoteException(depth + 1) == true
+}
+
+private fun getObjectFieldIfExists(instance: Any, fieldName: String): Any? {
+    return runCatching {
+        XposedHelpers.getObjectField(instance, fieldName)
+    }.getOrNull()
+}
+
 private fun gnssListenerHook(
     callback: XC_MethodHook.MethodHookParam.() -> Unit
 ): XC_MethodHook {
@@ -195,9 +209,60 @@ private fun suppressGnssDeadObjectHook(): XC_MethodHook {
     }
 }
 
+private fun suppressRemoteListenerHelperErrorsHook(): XC_MethodHook {
+    return object : XC_MethodHook() {
+        override fun beforeHookedMethod(param: MethodHookParam) {
+            val operation = getObjectFieldIfExists(param.thisObject, "mOperation") ?: return
+            val identifiedListener = getObjectFieldIfExists(param.thisObject, "mIdentifiedListener")
+            val listener = if (identifiedListener != null) {
+                getObjectFieldIfExists(identifiedListener, "mListener")
+            } else {
+                getObjectFieldIfExists(param.thisObject, "mListener")
+            } ?: return
+            val callerIdentity = identifiedListener?.let {
+                getObjectFieldIfExists(it, "mCallerIdentity")
+            }
+
+            val executeMethods = (operation.javaClass.declaredMethods.asSequence() +
+                    operation.javaClass.methods.asSequence())
+                .filter { it.name == "execute" && it.parameterTypes.size in 1..2 }
+                .distinctBy { it.toGenericString() }
+                .sortedByDescending { it.parameterTypes.size }
+                .toList()
+
+            for (execute in executeMethods) {
+                runCatching {
+                    execute.isAccessible = true
+                    if (execute.parameterTypes.size == 2) {
+                        execute.invoke(operation, listener, callerIdentity)
+                    } else {
+                        execute.invoke(operation, listener)
+                    }
+                    param.result = null
+                    return
+                }.onFailure {
+                    val throwable = if (it is InvocationTargetException) {
+                        it.targetException ?: it
+                    } else {
+                        it
+                    }
+                    if (throwable.isRemoteException()) {
+                        param.result = null
+                        return
+                    }
+                    if (it !is IllegalArgumentException) {
+                        throw throwable
+                    }
+                }
+            }
+        }
+    }
+}
+
 internal object LocationServiceHook: BaseLocationHook() {
     val locationListeners = LinkedBlockingQueue<Pair<String, IInterface>>()
     private val gnssStatusProxyHooked = AtomicBoolean(false)
+    private val remoteListenerHandlerHooked = AtomicBoolean(false)
 
     // A random command is generated to prevent some apps from detecting Portal
     operator fun invoke(classLoader: ClassLoader) {
@@ -219,6 +284,7 @@ internal object LocationServiceHook: BaseLocationHook() {
         }
 
         cILocationManager.classLoader!!.let {
+            hookRemoteListenerHelperHandlerRunnable(it)
             hookGnssStatusProxyDeadObject(it)
             BasicLocationHook(it)
             GnssHook(it)
@@ -895,6 +961,27 @@ internal object LocationServiceHook: BaseLocationHook() {
         val nmeaHooks = cGnssStatusProxy.hookAllMethods("onNmeaReceived", suppressGnssDeadObjectHook())
         if (FakeLoc.enableDebugLog) {
             Logger.debug("hook IGnssStatusListener.Stub.Proxy dead objects: sv=${svHooks.size}, nmea=${nmeaHooks.size}")
+        }
+    }
+
+    private fun hookRemoteListenerHelperHandlerRunnable(classLoader: ClassLoader) {
+        if (!remoteListenerHandlerHooked.compareAndSet(false, true)) return
+
+        val cHandlerRunnable = XposedHelpers.findClassIfExists(
+            "com.android.server.location.RemoteListenerHelper\$HandlerRunnable",
+            classLoader
+        )
+        if (cHandlerRunnable == null) {
+            remoteListenerHandlerHooked.set(false)
+            if (FakeLoc.enableDebugLog) {
+                Logger.debug("RemoteListenerHelper.HandlerRunnable not found")
+            }
+            return
+        }
+
+        val hooks = cHandlerRunnable.hookAllMethods("run", suppressRemoteListenerHelperErrorsHook())
+        if (FakeLoc.enableDebugLog) {
+            Logger.debug("hook RemoteListenerHelper.HandlerRunnable.run: ${hooks.size}")
         }
     }
 
