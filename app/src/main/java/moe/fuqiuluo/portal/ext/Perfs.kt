@@ -98,7 +98,14 @@ var Context.rockerCoords: Pair<Int, Int>
 var Context.speed: Double
     get() = sharedPrefs.getFloat("speed", FakeLoc.speed.toFloat()).toDouble()
     set(value) = sharedPrefs.edit {
-        putFloat("speed", value.toFloat())
+        // 添加速度合理性检查
+        // 步行: 0.5-2 m/s, 跑步: 2-6 m/s, 骑行: 3-10 m/s
+        // 限制范围: 0.1-15 m/s (0.36-54 km/h)
+        val validSpeed = value.coerceIn(0.1, 15.0)
+        if (value != validSpeed) {
+            android.util.Log.w("Perfs", "速度 ${value}m/s 超出合理范围，已限制为 ${validSpeed}m/s (${String.format("%.2f", validSpeed * 3.6)}km/h)")
+        }
+        putFloat("speed", validSpeed.toFloat())
     }
 
 var Context.altitude: Double

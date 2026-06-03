@@ -243,6 +243,12 @@ class MockFragment : Fragment() {
             try {
                 withContext(Dispatchers.IO) {
                     mockServiceViewModel.locationManager!!.let {
+                        // 修复：启动前同步配置到 Xposed 模块
+                        if (!MockServiceHelper.putConfig(it, context)) {
+                            showToast("配置同步失败")
+                            return@withContext
+                        }
+                        
                         if (MockServiceHelper.tryOpenMock(it, speed, altitude, accuracy)) {
                             updateMockButtonState(button, "停止模拟", R.drawable.rounded_play_disabled_24)
                         } else {

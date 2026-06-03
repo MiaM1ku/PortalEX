@@ -85,8 +85,14 @@ class MockServiceViewModel : ViewModel() {
                     delay(delayTime)
 
                     CrashReport.setUserSceneTag(applicationContext, 261773)
-                    if(!MockServiceHelper.move(locationManager!!, FakeLoc.speed / (1000 / delayTime) / 0.85, FakeLoc.bearing)) {
+                    // 修复：移除 /0.85，使用正确的速度计算公式
+                    // 移动距离 = 速度(米/秒) × 时间(秒)
+                    val moveDistance = FakeLoc.speed * (delayTime / 1000.0)
+                    if(!MockServiceHelper.move(locationManager!!, moveDistance, FakeLoc.bearing)) {
                         Log.e("MockServiceViewModel", "Failed to move")
+                    }
+                    if (FakeLoc.enableDebugLog) {
+                        Log.d("MockServiceViewModel", "摇杆移动: 速度=${FakeLoc.speed}m/s, 间隔=${delayTime}ms, 距离=${moveDistance}m")
                     }
                 } while (isActive)
             }
@@ -147,16 +153,20 @@ class MockServiceViewModel : ViewModel() {
                                 target.second
                             )
                             routeStage++
-                        } else if (inverse.s12 < FakeLoc.speed * getCurrentSpeedFactor() / (1000 / delayTime) / 0.85) {
-                            // 如果距离小于当前衰减后的单步移动距离，直接移动到目标点
-                            MockServiceHelper.setLocation(
-                                locationManager!!,
-                                target.first,
-                                target.second
-                            )
-                            routeStage++
                         } else {
-                            break
+                            // 修复：使用正确的单步移动距离计算
+                            val stepMoveDistance = FakeLoc.speed * getCurrentSpeedFactor() * (delayTime / 1000.0)
+                            if (inverse.s12 < stepMoveDistance) {
+                                // 如果距离小于当前衰减后的单步移动距离，直接移动到目标点
+                                MockServiceHelper.setLocation(
+                                    locationManager!!,
+                                    target.first,
+                                    target.second
+                                )
+                                routeStage++
+                            } else {
+                                break
+                            }
                         }
                     }
 
@@ -191,26 +201,27 @@ class MockServiceViewModel : ViewModel() {
                         azimuth += 360
                     }
 
-                    // ***** 速度衰减核心：计算当前实际移动距离并累加 *****
-                    val stepDistance = inverse.s12  // 本次需要移动的距离（米）
-                    if (stepDistance > 0) {
-                        // 累加实际移动的距离（注意：这里累加的是全部剩余距离，但因为可能一次移动不完，需要按比例累加？）
-                        // 更好的做法：每次移动只移动一部分，累加那部分距离。但当前 move 内部可能一次移动整段距离？
-                        // 观察 move 函数：它接收速度向量和方位角，移动固定距离（由速度 * 时间计算）。
-                        // 实际移动的距离是 speed * time，而不是 stepDistance。
-                        // 因此我们应该累加每次调用 move 实际移动的距离，而不是目标点剩余距离。
-                        // 但由于此循环每次 delayTime 调用一次 move，我们可以使用一个固定步长： moveStep = 当前衰减速度 * (delayTime / 1000)
-                        val moveStep = FakeLoc.speed * getCurrentSpeedFactor() * (delayTime / 1000.0)
-                        totalDistanceMoved += moveStep
-                        Log.d("MockServiceViewModel", "累计移动距离: %.2f m, 速度因子: %.3f".format(totalDistanceMoved, getCurrentSpeedFactor()))
-                    }
-
-                    Log.d("MockServiceViewModel", "从 $currentLat, $currentLon 移动到 ${target.first}, ${target.second}, 方位角: $azimuth")
-                    // 使用衰减后的速度进行移动
+                    // 修复：计算实际移动距离（速度衰减）
                     val decayedSpeed = FakeLoc.speed * getCurrentSpeedFactor()
+                    val moveDistance = decayedSpeed * (delayTime / 1000.0)
+                    
+                    // 累加实际移动的距离（与实际移动保持一致）
+                    totalDistanceMoved += moveDistance
+                    
+                    if (FakeLoc.enableDebugLog) {
+                        Log.d("MockServiceViewModel", """
+                            路径移动: 速度=${FakeLoc.speed}m/s, 速度因子=${String.format("%.3f", getCurrentSpeedFactor())}
+                            间隔=${delayTime}ms, 移动距离=${String.format("%.3f", moveDistance)}m
+                            累计距离=${String.format("%.2f", totalDistanceMoved)}m, 剩余距离=${String.format("%.2f", inverse.s12)}m
+                            从 (${String.format("%.6f", currentLat)}, ${String.format("%.6f", currentLon)})
+                            到 (${String.format("%.6f", target.first)}, ${String.format("%.6f", target.second)}), 方位角: ${String.format("%.2f", azimuth)}°
+                        """.trimIndent())
+                    }
+                    
+                    // 使用修正后的移动距离
                     if (!MockServiceHelper.move(
                             locationManager!!,
-                            decayedSpeed / (1000 / delayTime) / 0.85,
+                            moveDistance,
                             azimuth
                         )
                     ) {

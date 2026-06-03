@@ -341,6 +341,12 @@ class RouteMockFragment : Fragment() {
             button.isClickable = false
             try {
                 withContext(Dispatchers.IO) {
+                    // 修复：启动前同步配置到 Xposed 模块
+                    if (!MockServiceHelper.putConfig(mockServiceViewModel.locationManager!!, context)) {
+                        showToast("配置同步失败")
+                        return@withContext
+                    }
+                    
                     if (MockServiceHelper.tryOpenMock(
                             mockServiceViewModel.locationManager!!,
                             speed,
