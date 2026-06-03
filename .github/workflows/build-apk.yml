@@ -51,8 +51,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GOOGLE_SERVICES_JSON}" ]; then
-            echo "::error::Missing repository secret GOOGLE_SERVICES_JSON"
-            exit 1
+            echo "GOOGLE_SERVICES_JSON is not set, skipping google-services.json setup."
+            exit 0
           fi
           printf '%s' "${GOOGLE_SERVICES_JSON}" | base64 -d > app/google-services.json
         env:
