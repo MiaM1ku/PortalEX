@@ -44,10 +44,9 @@ abstract class BaseLocationHook: BaseDivineService() {
         location.latitude = jitterLat.first
         location.longitude = jitterLat.second
         location.altitude = FakeLoc.offset_altitude
-        val speedAmp = Random.nextDouble(-FakeLoc.speedAmplitude, FakeLoc.speedAmplitude)
-        location.speed = (originLocation.speed + speedAmp).toFloat()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && originLocation.hasSpeedAccuracy()) {
-            location.speedAccuracyMetersPerSecond = (FakeLoc.speed + speedAmp).toFloat()
+        location.speed = FakeLoc.reportedSpeed()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            location.speedAccuracyMetersPerSecond = FakeLoc.speedAmplitude.toFloat().coerceAtLeast(0.05f)
         }
 
         if (location.altitude == 0.0) {
@@ -70,10 +69,6 @@ abstract class BaseLocationHook: BaseDivineService() {
             if (location.hasBearingAccuracy() && location.bearingAccuracyDegrees == 0.0f) {
                 location.bearingAccuracyDegrees = 1.0f
             }
-        }
-
-        if (location.speed == 0.0f) {
-            location.speed = 1.2f
         }
 
         location.elapsedRealtimeNanos = originLocation.elapsedRealtimeNanos
@@ -156,7 +151,13 @@ abstract class BaseLocationHook: BaseDivineService() {
                     value.trackAngle = FakeLoc.bearing
                     value.toNmeaString()
                 }
-                // 其他语句类型（DTM、GSA、GSV、VTG）不做修改，原样返回
+                is NmeaValue.VTG -> {
+                    value.trueTrack = FakeLoc.bearing
+                    value.groundSpeedKnots = FakeLoc.speed * 1.94384
+                    value.groundSpeedKph = FakeLoc.speed * 3.6
+                    value.toNmeaString()
+                }
+                // 其他语句类型（DTM、GSA、GSV）不做修改，原样返回
                 else -> nmeaStr
             }
         }.onFailure {

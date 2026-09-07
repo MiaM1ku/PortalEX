@@ -12,7 +12,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import moe.fuqiuluo.portal.android.coro.CoroutineController
 import moe.fuqiuluo.portal.android.coro.CoroutineRouteMock
-import moe.fuqiuluo.portal.ext.Loc4j
 import moe.fuqiuluo.portal.ext.accuracy
 import moe.fuqiuluo.portal.ext.altitude
 import moe.fuqiuluo.portal.ext.reportDuration
@@ -23,7 +22,6 @@ import moe.fuqiuluo.portal.ui.mock.HistoricalRoute
 import moe.fuqiuluo.portal.ui.mock.Rocker
 import moe.fuqiuluo.xposed.utils.FakeLoc
 import net.sf.geographiclib.Geodesic
-import kotlin.math.abs
 
 class MockServiceViewModel : ViewModel() {
     lateinit var rocker: Rocker
@@ -47,29 +45,6 @@ class MockServiceViewModel : ViewModel() {
     var selectedLocation: HistoricalLocation? = null
     var selectedRoute: HistoricalRoute? = null
 
-    // ---------- 速度衰减相关 ----------
-    private var totalDistanceMoved = 0.0          // 累计移动距离（米）
-    private val decayDistanceThreshold = 14000.0 // 衰减阈值（米），对应步频模拟的20000步（平均步幅0.7m）
-    private val minSpeedFactor = 130.0 / 190.0   // 最小速度因子 ≈ 0.6842
-
-    /**
-     * 根据累计移动距离计算当前速度衰减因子（线性衰减）
-     * 距离从 0 → decayDistanceThreshold，因子从 1.0 → minSpeedFactor
-     */
-    private fun getCurrentSpeedFactor(): Double {
-        val progress = (totalDistanceMoved / decayDistanceThreshold).coerceIn(0.0, 1.0)
-        return 1.0 - (1.0 - minSpeedFactor) * progress
-    }
-
-    /**
-     * 重置累计距离（例如重新开始路线模拟时调用）
-     */
-    private fun resetDistanceAccumulator() {
-        totalDistanceMoved = 0.0
-        Log.d("MockServiceViewModel", "速度衰减累计距离已重置")
-    }
-    // ---------------------------------
-
     fun initRocker(activity: Activity): Rocker {
         if (!::rocker.isInitialized) {
             rocker = Rocker(activity)
@@ -85,8 +60,7 @@ class MockServiceViewModel : ViewModel() {
                     delay(delayTime)
 
                     CrashReport.setUserSceneTag(applicationContext, 261773)
-                    // 修复：移除 /0.85，使用正确的速度计算公式
-                    // 移动距离 = 速度(米/秒) × 时间(秒)
+                    FakeLoc.speed = applicationContext.speed
                     val moveDistance = FakeLoc.speed * (delayTime / 1000.0)
                     if(!MockServiceHelper.move(locationManager!!, moveDistance, FakeLoc.bearing)) {
                         Log.e("MockServiceViewModel", "Failed to move")
@@ -105,8 +79,7 @@ class MockServiceViewModel : ViewModel() {
         if (!::routeMockJob.isInitialized || routeMockJob.isCancelled) {
             routeMockCoroutine.pause()
             val delayTime = activity.reportDuration.toLong()
-            // 每次启动路线模拟时重置累计距离（保证衰减从头开始）
-            resetDistanceAccumulator()
+            val applicationContext = activity.applicationContext
 
             routeMockJob = GlobalScope.launch {
                 do {
@@ -127,7 +100,6 @@ class MockServiceViewModel : ViewModel() {
                             route[0].first,
                             route[0].second
                         )
-                        resetDistanceAccumulator()
                         routeStage++
                     }
 
@@ -154,10 +126,10 @@ class MockServiceViewModel : ViewModel() {
                             )
                             routeStage++
                         } else {
-                            // 修复：使用正确的单步移动距离计算
-                            val stepMoveDistance = FakeLoc.speed * getCurrentSpeedFactor() * (delayTime / 1000.0)
+                            FakeLoc.speed = applicationContext.speed
+                            val stepMoveDistance = FakeLoc.speed * (delayTime / 1000.0)
                             if (inverse.s12 < stepMoveDistance) {
-                                // 如果距离小于当前衰减后的单步移动距离，直接移动到目标点
+                                // 如果距离小于当前单步移动距离，直接移动到目标点
                                 MockServiceHelper.setLocation(
                                     locationManager!!,
                                     target.first,
@@ -174,7 +146,6 @@ class MockServiceViewModel : ViewModel() {
                     if (routeStage >= route.size) {
                         // 重设阶段
                         routeStage = 0
-                        resetDistanceAccumulator()
                         if (isRouteLoopEnabled) {
                             continue
                         } else {
@@ -201,24 +172,19 @@ class MockServiceViewModel : ViewModel() {
                         azimuth += 360
                     }
 
-                    // 修复：计算实际移动距离（速度衰减）
-                    val decayedSpeed = FakeLoc.speed * getCurrentSpeedFactor()
-                    val moveDistance = decayedSpeed * (delayTime / 1000.0)
-                    
-                    // 累加实际移动的距离（与实际移动保持一致）
-                    totalDistanceMoved += moveDistance
-                    
+                    FakeLoc.speed = applicationContext.speed
+                    val moveDistance = FakeLoc.speed * (delayTime / 1000.0)
+
                     if (FakeLoc.enableDebugLog) {
                         Log.d("MockServiceViewModel", """
-                            路径移动: 速度=${FakeLoc.speed}m/s, 速度因子=${String.format("%.3f", getCurrentSpeedFactor())}
+                            路径移动: 速度=${FakeLoc.speed}m/s
                             间隔=${delayTime}ms, 移动距离=${String.format("%.3f", moveDistance)}m
-                            累计距离=${String.format("%.2f", totalDistanceMoved)}m, 剩余距离=${String.format("%.2f", inverse.s12)}m
+                            剩余距离=${String.format("%.2f", inverse.s12)}m
                             从 (${String.format("%.6f", currentLat)}, ${String.format("%.6f", currentLon)})
                             到 (${String.format("%.6f", target.first)}, ${String.format("%.6f", target.second)}), 方位角: ${String.format("%.2f", azimuth)}°
                         """.trimIndent())
                     }
-                    
-                    // 使用修正后的移动距离
+
                     if (!MockServiceHelper.move(
                             locationManager!!,
                             moveDistance,

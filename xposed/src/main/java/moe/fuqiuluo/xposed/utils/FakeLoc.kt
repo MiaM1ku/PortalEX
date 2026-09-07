@@ -106,7 +106,10 @@ object FakeLoc {
 
     @Volatile var speed = 3.05
 
-    var speedAmplitude = 1.0
+    /**
+     * 速度噪声幅度（米/秒）。保持较小，避免自定义速度被明显拉偏。
+     */
+    var speedAmplitude = 0.05
 
     @Volatile var hasBearings = false
 
@@ -155,9 +158,21 @@ object FakeLoc {
         return Pair(newLat, newLon)
     }
 
+    fun reportedSpeed(): Float {
+        val amp = if (speedAmplitude > 0.0) {
+            Random.nextDouble(-speedAmplitude, speedAmplitude)
+        } else {
+            0.0
+        }
+        return (speed + amp).coerceAtLeast(0.0).toFloat()
+    }
+
     fun moveLocation(lat: Double = latitude, lon: Double = longitude, n: Double, angle: Double = bearing): Pair<Double, Double> {
+        if (n == 0.0) {
+            return Pair(lat, lon)
+        }
         val earthRadius = 6371000.0
-        val radiusInDegrees = Random.nextDouble(n, n + 1.2) / earthRadius * (180 / PI)
+        val radiusInDegrees = n / earthRadius * (180 / PI)
         val newLat = lat + radiusInDegrees * cos(Math.toRadians(angle))
         val newLon = lon + radiusInDegrees * sin(Math.toRadians(angle)) / cos(Math.toRadians(lat))
         return Pair(newLat, newLon)

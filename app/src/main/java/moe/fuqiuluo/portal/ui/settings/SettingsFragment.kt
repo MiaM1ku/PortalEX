@@ -35,6 +35,7 @@ import moe.fuqiuluo.portal.ext.speed
 import moe.fuqiuluo.portal.service.MockServiceHelper
 import moe.fuqiuluo.portal.ui.viewmodel.MockServiceViewModel
 import moe.fuqiuluo.portal.ui.viewmodel.SettingsViewModel
+import moe.fuqiuluo.xposed.utils.FakeLoc
 import kotlin.getValue
 
 class SettingsFragment : Fragment() {
@@ -99,7 +100,15 @@ class SettingsFragment : Fragment() {
                     return@showDialog
                 }
                 context.speed = value
-                binding.speedValue.text = "%.2f米/秒".format(value)
+                FakeLoc.speed = context.speed
+                binding.speedValue.text = "%.2f米/秒".format(context.speed)
+                mockServiceViewModel.locationManager?.let { locationManager ->
+                    if (MockServiceHelper.isServiceInit() &&
+                        !MockServiceHelper.setSpeed(locationManager, context.speed)
+                    ) {
+                        showToast("速度已保存，但同步到系统服务失败")
+                    }
+                }
             }
         }
 

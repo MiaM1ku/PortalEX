@@ -195,13 +195,13 @@ object MockServiceHelper {
         return locationManager.sendExtraCommand(PROVIDER_NAME, randomKey, rely)
     }
 
-    fun setSpeed(locationManager: LocationManager, speed: Float): Boolean {
+    fun setSpeed(locationManager: LocationManager, speed: Double): Boolean {
         if (!::randomKey.isInitialized) {
             return false
         }
         val rely = Bundle()
         rely.putString("command_id", "set_speed")
-        rely.putFloat("speed", speed)
+        rely.putDouble("speed", speed)
         return locationManager.sendExtraCommand(PROVIDER_NAME, randomKey, rely)
     }
 
@@ -232,7 +232,7 @@ object MockServiceHelper {
         val rely = Bundle()
         rely.putString("command_id", "get_speed")
         if(locationManager.sendExtraCommand(PROVIDER_NAME, randomKey, rely)) {
-            return rely.getFloat("speed")
+            return rely.getDouble("speed").toFloat()
         }
         return null
     }
